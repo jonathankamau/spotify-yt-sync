@@ -1,0 +1,9 @@
+{
+  "github_pat": "",
+  "github_username": "",
+  "spotify_client_id": "",
+  "spotify_client_secret": "",
+  "spotify_redirect_uri": "http://localhost:8888/callback",
+  "youtube_client_secrets_b64": "",
+  "youtube_playlist_id": ""
+}
