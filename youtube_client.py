@@ -111,9 +111,11 @@ class YouTubeClient:
 
     def validate_playlist(self, playlist_id: str) -> bool:
         try:
-            self._youtube.playlists().list(
-                part="snippet", id=playlist_id
-            ).execute()
+            self._request_with_retry(
+                lambda: self._youtube.playlists().list(
+                    part="snippet", id=playlist_id
+                ).execute()
+            )
             return True
         except HttpError as exc:
             logger.error("Cannot access playlist %s: %s", playlist_id, exc)
