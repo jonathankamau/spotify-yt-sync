@@ -44,6 +44,13 @@ jobs:
           LOG_FILE_PATH: sync.log
         run: python main.py
 
+      - name: Persist refreshed tokens
+        if: always()
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+          GH_REPO: ${{ github.repository }}
+        run: python upload_tokens.py
+
       - name: Commit updated state
         run: |
           git config user.name "github-actions[bot]"
