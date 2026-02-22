@@ -20,6 +20,9 @@ def setup_logging(log_file_path: str) -> None:
     )
 
 
+MAX_TRACKS_PER_RUN = 25
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sync Spotify liked songs to YouTube playlist")
     parser.add_argument("--dry-run", action="store_true", help="Log actions without modifying the YouTube playlist")
@@ -42,6 +45,10 @@ def main() -> None:
 
     new_tracks = [t for t in liked_songs if t["id"] not in processed_ids]
     logger.info("%d new tracks to process (out of %d total liked songs)", len(new_tracks), len(liked_songs))
+
+    if len(new_tracks) > MAX_TRACKS_PER_RUN:
+        logger.info("Limiting to %d tracks this run to stay within YouTube API quota", MAX_TRACKS_PER_RUN)
+        new_tracks = new_tracks[:MAX_TRACKS_PER_RUN]
 
     if not new_tracks:
         logger.info("No new tracks to sync. Done.")
