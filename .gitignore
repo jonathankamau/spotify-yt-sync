@@ -1,0 +1,8 @@
+.env
+bootstrap_config.json
+client_secrets.json
+.spotify_token_cache
+.youtube_token_cache
+sync.log
+__pycache__/
+*.pyc

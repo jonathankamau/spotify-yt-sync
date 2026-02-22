@@ -1,0 +1,53 @@
+name: "Spotify → YouTube Sync"
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Decode secrets to files
+        env:
+          YOUTUBE_CLIENT_SECRETS_B64: ${{ secrets.YOUTUBE_CLIENT_SECRETS_B64 }}
+          SPOTIFY_TOKEN_CACHE_B64: ${{ secrets.SPOTIFY_TOKEN_CACHE_B64 }}
+          YOUTUBE_TOKEN_CACHE_B64: ${{ secrets.YOUTUBE_TOKEN_CACHE_B64 }}
+        run: |
+          echo "$YOUTUBE_CLIENT_SECRETS_B64" | base64 -d > client_secrets.json
+          echo "$SPOTIFY_TOKEN_CACHE_B64" | base64 -d > .spotify_token_cache
+          echo "$YOUTUBE_TOKEN_CACHE_B64" | base64 -d > .youtube_token_cache
+
+      - name: Run sync
+        env:
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
+          SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
+          YOUTUBE_PLAYLIST_ID: ${{ secrets.YOUTUBE_PLAYLIST_ID }}
+          SPOTIFY_TOKEN_PATH: .spotify_token_cache
+          YOUTUBE_TOKEN_PATH: .youtube_token_cache
+          YOUTUBE_CLIENT_SECRETS_FILE: client_secrets.json
+          STATE_FILE_PATH: state.json
+          LOG_FILE_PATH: sync.log
+        run: python main.py
+
+      - name: Commit updated state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add state.json
+          git diff --staged --quiet || git commit -m "chore: update sync state [skip ci]"
+          git push
