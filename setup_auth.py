@@ -15,26 +15,27 @@ import json
 import os
 import sys
 import threading
+import time
 import urllib.parse
-import webbrowser
 
 import requests
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 from google_auth_oauthlib.flow import Flow
-from google.oauth2.credentials import Credentials
 from nacl import encoding, public
 
 CONFIG_FILE = "bootstrap_config.json"
 REPO_NAME = "spotify-yt-sync"
 LOCAL_PORT = 8888
-REDIRECT_URI = f"http://localhost:{LOCAL_PORT}/callback"
+REDIRECT_URI = f"http://127.0.0.1:{LOCAL_PORT}/callback"
 
 SPOTIFY_SCOPE = "user-library-read"
 YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube"]
 
 SPOTIFY_TOKEN_FILE = ".spotify_token_cache"
 YOUTUBE_TOKEN_FILE = ".youtube_token_cache"
+
+
+class OAuthCallbackServer(http.server.HTTPServer):
+    allow_reuse_address = True
 
 
 class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
@@ -44,6 +45,10 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
     shutdown_event: threading.Event
 
     def do_GET(self):
+        if not self.path.startswith("/callback"):
+            self.send_response(204)
+            self.end_headers()
+            return
         OAuthCallbackHandler.captured_url = self.path
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
@@ -55,18 +60,25 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
         pass
 
 
+_shared_server: OAuthCallbackServer | None = None
+
+
+def get_server() -> OAuthCallbackServer:
+    global _shared_server
+    if _shared_server is None:
+        _shared_server = OAuthCallbackServer(("127.0.0.1", LOCAL_PORT), OAuthCallbackHandler)
+        _shared_server.timeout = 1
+    return _shared_server
+
+
 def wait_for_callback() -> str:
     OAuthCallbackHandler.captured_url = None
     OAuthCallbackHandler.shutdown_event = threading.Event()
 
-    server = http.server.HTTPServer(("", LOCAL_PORT), OAuthCallbackHandler)
-    server.timeout = 300
+    server = get_server()
 
-    thread = threading.Thread(target=lambda: _serve_until_callback(server))
-    thread.start()
-    OAuthCallbackHandler.shutdown_event.wait(timeout=300)
-    server.shutdown()
-    thread.join()
+    while not OAuthCallbackHandler.shutdown_event.is_set():
+        server.handle_request()
 
     if OAuthCallbackHandler.captured_url is None:
         print("ERROR: Timed out waiting for OAuth callback.")
@@ -75,36 +87,43 @@ def wait_for_callback() -> str:
     return OAuthCallbackHandler.captured_url
 
 
-def _serve_until_callback(server: http.server.HTTPServer):
-    while not OAuthCallbackHandler.shutdown_event.is_set():
-        server.handle_request()
-
-
 def do_spotify_auth(cfg: dict) -> None:
-    print("\n--- Spotify OAuth ---")
-    auth_manager = SpotifyOAuth(
-        client_id=cfg["spotify_client_id"],
-        client_secret=cfg["spotify_client_secret"],
-        redirect_uri=REDIRECT_URI,
-        scope=SPOTIFY_SCOPE,
-        cache_path=SPOTIFY_TOKEN_FILE,
-        open_browser=False,
-    )
+    print("\n--- Spotify OAuth ---", flush=True)
 
-    auth_url = auth_manager.get_authorize_url()
-    print(f"\nOpen this URL in your browser to authorize Spotify:\n\n  {auth_url}\n")
+    params = urllib.parse.urlencode({
+        "client_id": cfg["spotify_client_id"],
+        "response_type": "code",
+        "redirect_uri": REDIRECT_URI,
+        "scope": SPOTIFY_SCOPE,
+    })
+    auth_url = f"https://accounts.spotify.com/authorize?{params}"
+    print(f"\nOpen this URL in your browser to authorize Spotify:\n\n  {auth_url}\n", flush=True)
 
     callback_path = wait_for_callback()
     parsed = urllib.parse.urlparse(callback_path)
-    params = urllib.parse.parse_qs(parsed.query)
-    code = params.get("code", [None])[0]
+    query_params = urllib.parse.parse_qs(parsed.query)
+    code = query_params.get("code", [None])[0]
 
     if not code:
         print("ERROR: No authorization code received from Spotify.")
         sys.exit(1)
 
-    auth_manager.get_access_token(code, as_dict=False)
-    print(f"Spotify token saved to {SPOTIFY_TOKEN_FILE}")
+    auth_b64 = base64.b64encode(f"{cfg['spotify_client_id']}:{cfg['spotify_client_secret']}".encode()).decode()
+    resp = requests.post(
+        "https://accounts.spotify.com/api/token",
+        headers={"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"},
+        data={"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT_URI},
+        timeout=15,
+    )
+    if resp.status_code != 200:
+        print(f"ERROR: Spotify token exchange failed: {resp.status_code} {resp.text}")
+        sys.exit(1)
+
+    token_data = resp.json()
+    token_data["expires_at"] = int(time.time()) + token_data.get("expires_in", 3600)
+    with open(SPOTIFY_TOKEN_FILE, "w") as f:
+        json.dump(token_data, f)
+    print(f"Spotify token saved to {SPOTIFY_TOKEN_FILE}", flush=True)
 
 
 def do_youtube_auth(cfg: dict) -> None:
@@ -115,10 +134,11 @@ def do_youtube_auth(cfg: dict) -> None:
     with open(secrets_path, "w") as f:
         f.write(secrets_json)
 
+    yt_redirect = f"http://localhost:{LOCAL_PORT}/callback"
     flow = Flow.from_client_secrets_file(
         secrets_path,
         scopes=YOUTUBE_SCOPES,
-        redirect_uri=REDIRECT_URI,
+        redirect_uri=yt_redirect,
     )
 
     auth_url, _ = flow.authorization_url(
@@ -134,7 +154,12 @@ def do_youtube_auth(cfg: dict) -> None:
     code = params.get("code", [None])[0]
 
     if not code:
-        print("ERROR: No authorization code received from YouTube.")
+        error = params.get("error", ["unknown"])[0]
+        error_desc = params.get("error_description", [""])[0]
+        print(f"ERROR: No authorization code received from YouTube.")
+        print(f"  Google returned error: {error}")
+        if error_desc:
+            print(f"  Description: {error_desc}")
         sys.exit(1)
 
     flow.fetch_token(code=code)
