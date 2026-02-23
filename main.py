@@ -20,7 +20,7 @@ def setup_logging(log_file_path: str) -> None:
     )
 
 
-MAX_TRACKS_PER_RUN = 25
+MAX_TRACKS_PER_RUN = 90
 
 
 def main() -> None:
