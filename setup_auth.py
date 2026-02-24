@@ -134,42 +134,44 @@ def do_youtube_auth(cfg: dict) -> None:
     with open(secrets_path, "w") as f:
         f.write(secrets_json)
 
-    yt_redirect = f"http://localhost:{LOCAL_PORT}/callback"
-    flow = Flow.from_client_secrets_file(
-        secrets_path,
-        scopes=YOUTUBE_SCOPES,
-        redirect_uri=yt_redirect,
-    )
+    try:
+        yt_redirect = f"http://127.0.0.1:{LOCAL_PORT}/callback"
+        flow = Flow.from_client_secrets_file(
+            secrets_path,
+            scopes=YOUTUBE_SCOPES,
+            redirect_uri=yt_redirect,
+        )
 
-    auth_url, _ = flow.authorization_url(
-        access_type="offline",
-        include_granted_scopes="true",
-        prompt="consent",
-    )
-    print(f"\nOpen this URL in your browser to authorize YouTube:\n\n  {auth_url}\n")
+        auth_url, _ = flow.authorization_url(
+            access_type="offline",
+            include_granted_scopes="true",
+            prompt="consent",
+        )
+        print(f"\nOpen this URL in your browser to authorize YouTube:\n\n  {auth_url}\n")
 
-    callback_path = wait_for_callback()
-    parsed = urllib.parse.urlparse(callback_path)
-    params = urllib.parse.parse_qs(parsed.query)
-    code = params.get("code", [None])[0]
+        callback_path = wait_for_callback()
+        parsed = urllib.parse.urlparse(callback_path)
+        params = urllib.parse.parse_qs(parsed.query)
+        code = params.get("code", [None])[0]
 
-    if not code:
-        error = params.get("error", ["unknown"])[0]
-        error_desc = params.get("error_description", [""])[0]
-        print(f"ERROR: No authorization code received from YouTube.")
-        print(f"  Google returned error: {error}")
-        if error_desc:
-            print(f"  Description: {error_desc}")
-        sys.exit(1)
+        if not code:
+            error = params.get("error", ["unknown"])[0]
+            error_desc = params.get("error_description", [""])[0]
+            print(f"ERROR: No authorization code received from YouTube.")
+            print(f"  Google returned error: {error}")
+            if error_desc:
+                print(f"  Description: {error_desc}")
+            sys.exit(1)
 
-    flow.fetch_token(code=code)
-    creds = flow.credentials
+        flow.fetch_token(code=code)
+        creds = flow.credentials
 
-    with open(YOUTUBE_TOKEN_FILE, "w") as f:
-        f.write(creds.to_json())
-    print(f"YouTube token saved to {YOUTUBE_TOKEN_FILE}")
-
-    os.remove(secrets_path)
+        with open(YOUTUBE_TOKEN_FILE, "w") as f:
+            f.write(creds.to_json())
+        print(f"YouTube token saved to {YOUTUBE_TOKEN_FILE}")
+    finally:
+        if os.path.exists(secrets_path):
+            os.remove(secrets_path)
 
 
 def encrypt_secret(public_key_b64: str, secret_value: str) -> str:
