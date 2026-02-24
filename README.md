@@ -7,14 +7,14 @@ Automatically syncs your Spotify liked songs to a YouTube playlist by searching 
 - **Python 3.11+**
 - **Spotify Developer account** — [developer.spotify.com](https://developer.spotify.com)
 - **Google Cloud project** with YouTube Data API v3 enabled
-- **GitHub Personal Access Token (PAT)** with `repo` and `admin:org` scopes
+- **GitHub Personal Access Token (PAT)** with `repo` scope
 
 ## Setup
 
 ### 1. Spotify App
 
 1. Go to [developer.spotify.com/dashboard](https://developer.spotify.com/dashboard) and create a new app
-2. Set the **Redirect URI** to `http://localhost:8888/callback`
+2. Set the **Redirect URI** to `http://127.0.0.1:8888/callback`
 3. Copy the **Client ID** and **Client Secret**
 
 ### 2. YouTube / Google Cloud
@@ -60,7 +60,7 @@ Automatically syncs your Spotify liked songs to a YouTube playlist by searching 
      "github_username": "your-username",
      "spotify_client_id": "xxxxxxxx",
      "spotify_client_secret": "xxxxxxxx",
-     "spotify_redirect_uri": "http://localhost:8888/callback",
+     "spotify_redirect_uri": "http://127.0.0.1:8888/callback",
      "youtube_client_secrets_b64": "<base64 string from step 2.6>",
      "youtube_playlist_id": "PLxxxxxxxxxxxxxx"
    }

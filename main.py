@@ -85,6 +85,7 @@ def main() -> None:
 
             if args.dry_run:
                 logger.info("[DRY RUN] Would add video %s for %s", video_id, track_label)
+                added_count += 1
             else:
                 youtube.add_video_to_playlist(config.youtube_playlist_id, video_id)
                 existing_video_ids.add(video_id)

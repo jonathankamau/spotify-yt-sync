@@ -3,7 +3,6 @@ import time
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -111,11 +110,14 @@ class YouTubeClient:
 
     def validate_playlist(self, playlist_id: str) -> bool:
         try:
-            self._request_with_retry(
+            response = self._request_with_retry(
                 lambda: self._youtube.playlists().list(
                     part="snippet", id=playlist_id
                 ).execute()
             )
+            if not response.get("items"):
+                logger.error("Playlist %s not found or not accessible", playlist_id)
+                return False
             return True
         except HttpError as exc:
             logger.error("Cannot access playlist %s: %s", playlist_id, exc)
