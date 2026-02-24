@@ -66,7 +66,11 @@ class YouTubeClient:
             return None
 
     def get_playlist_video_ids(self, playlist_id: str) -> set[str]:
-        video_ids: set[str] = set()
+        return set(self.get_playlist_item_map(playlist_id).keys())
+
+    def get_playlist_item_map(self, playlist_id: str) -> dict[str, str]:
+        """Return mapping of video_id -> playlist_item_id for all items."""
+        item_map: dict[str, str] = {}
         page_token = None
 
         while True:
@@ -82,14 +86,14 @@ class YouTubeClient:
             )
 
             for item in response.get("items", []):
-                video_ids.add(item["contentDetails"]["videoId"])
+                item_map[item["contentDetails"]["videoId"]] = item["id"]
 
             page_token = response.get("nextPageToken")
             if not page_token:
                 break
 
-        logger.info("Found %d existing videos in playlist %s", len(video_ids), playlist_id)
-        return video_ids
+        logger.info("Found %d existing videos in playlist %s", len(item_map), playlist_id)
+        return item_map
 
     def add_video_to_playlist(self, playlist_id: str, video_id: str) -> None:
         body = {
@@ -107,6 +111,14 @@ class YouTubeClient:
             .execute()
         )
         logger.info("Added video %s to playlist %s", video_id, playlist_id)
+
+    def remove_playlist_item(self, playlist_item_id: str) -> None:
+        self._request_with_retry(
+            lambda: self._youtube.playlistItems()
+            .delete(id=playlist_item_id)
+            .execute()
+        )
+        logger.info("Removed playlist item %s", playlist_item_id)
 
     def validate_playlist(self, playlist_id: str) -> bool:
         try:

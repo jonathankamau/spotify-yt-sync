@@ -2,17 +2,24 @@ import json
 import logging
 import os
 from abc import ABC, abstractmethod
+from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
 
 
+@dataclass
+class SyncState:
+    processed_ids: set[str] = field(default_factory=set)
+    track_video_map: dict[str, str] = field(default_factory=dict)
+
+
 class StateBackend(ABC):
     @abstractmethod
-    def load(self) -> set[str]:
+    def load(self) -> SyncState:
         ...
 
     @abstractmethod
-    def save(self, ids: set[str]) -> None:
+    def save(self, state: SyncState) -> None:
         ...
 
 
@@ -20,31 +27,35 @@ class JsonFileStateBackend(StateBackend):
     def __init__(self, path: str) -> None:
         self._path = path
 
-    def load(self) -> set[str]:
+    def load(self) -> SyncState:
         if not os.path.exists(self._path):
             logger.info("No state file found at %s, starting fresh", self._path)
-            return set()
+            return SyncState()
 
         with open(self._path, "r") as f:
             data = json.load(f)
 
-        ids = set(data.get("processed_track_ids", []))
-        logger.info("Loaded %d processed track IDs from state", len(ids))
-        return ids
+        processed_ids = set(data.get("processed_track_ids", []))
+        track_video_map = data.get("track_video_map", {})
+        logger.info("Loaded %d processed track IDs from state", len(processed_ids))
+        return SyncState(processed_ids=processed_ids, track_video_map=track_video_map)
 
-    def save(self, ids: set[str]) -> None:
-        data = {"processed_track_ids": sorted(ids)}
+    def save(self, state: SyncState) -> None:
+        data = {
+            "processed_track_ids": sorted(state.processed_ids),
+            "track_video_map": dict(sorted(state.track_video_map.items())),
+        }
         with open(self._path, "w") as f:
             json.dump(data, f, indent=2)
-        logger.info("Saved %d processed track IDs to state", len(ids))
+        logger.info("Saved %d processed track IDs to state", len(state.processed_ids))
 
 
 class StateManager:
     def __init__(self, backend: StateBackend) -> None:
         self._backend = backend
 
-    def load(self) -> set[str]:
+    def load(self) -> SyncState:
         return self._backend.load()
 
-    def save(self, ids: set[str]) -> None:
-        self._backend.save(ids)
+    def save(self, state: SyncState) -> None:
+        self._backend.save(state)
