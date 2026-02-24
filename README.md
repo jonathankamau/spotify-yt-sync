@@ -104,11 +104,14 @@ This will:
 1. The GitHub Actions workflow runs every 6 hours (or on manual trigger)
 2. It decodes OAuth tokens from GitHub secrets to local files
 3. `main.py` fetches all your Spotify liked songs
-4. For each new (unprocessed) track:
+4. Tracks that were previously synced but are no longer liked are detected:
+   - The corresponding video is removed from the YouTube playlist
+   - The track is removed from the local state
+5. For each new (unprocessed) track:
    - Searches YouTube for `"{track name} {artist} official music video"`
    - Adds the top result to your YouTube playlist (if not already present)
-5. Updates `state.json` to track which songs have been processed
-6. Commits `state.json` back to the repo
+6. Updates `state.json` to track which songs have been processed and their YouTube video IDs
+7. Commits `state.json` back to the repo
 
 ## Token Refresh
 
@@ -144,8 +147,8 @@ spotify-yt-sync/
 
 ## Limitations / Out of Scope
 
-- Does **not** remove videos when a song is unliked on Spotify
 - YouTube Music is not supported as a target
 - Single-user only
 - No web UI
 - State is stored in a JSON file (DynamoDB adapter is abstracted but not implemented)
+- Tracks synced before the removal feature was added lack a video mapping and cannot be automatically removed from the playlist if unliked
