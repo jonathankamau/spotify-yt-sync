@@ -3,6 +3,7 @@ import logging
 import sys
 
 from config import load_config
+from email_notifier import EmailNotifier, SyncReport, TrackInfo
 from spotify_client import SpotifyClient
 from state_manager import JsonFileStateBackend, StateManager
 from youtube_client import YouTubeClient
@@ -78,6 +79,8 @@ def main() -> None:
 
     if not new_tracks and not unliked_list:
         logger.info("No changes to sync. Done.")
+        if config.email_enabled:
+            _send_report(config, SyncReport(dry_run=args.dry_run), logger)
         return
 
     youtube = YouTubeClient(config)
@@ -85,6 +88,8 @@ def main() -> None:
     if not youtube.validate_playlist(config.youtube_playlist_id):
         logger.error("Cannot access YouTube playlist %s. Aborting.", config.youtube_playlist_id)
         sys.exit(1)
+
+    report = SyncReport(dry_run=args.dry_run)
 
     # --- Remove unliked tracks ---
     removed_count = 0
@@ -96,6 +101,12 @@ def main() -> None:
 
     for track_id in unliked_list:
         video_id = state.track_video_map.get(track_id)
+        track_meta = state.track_name_map.get(track_id)
+        track_label = (
+            f"'{track_meta['name']}' by {track_meta['artist']}"
+            if track_meta
+            else f"track {track_id}"
+        )
 
         if video_id is None:
             logger.warning(
@@ -103,6 +114,7 @@ def main() -> None:
                 track_id,
             )
             state.processed_ids.discard(track_id)
+            state.track_name_map.pop(track_id, None)
             continue
 
         assert playlist_item_map is not None
@@ -116,6 +128,7 @@ def main() -> None:
             )
             state.processed_ids.discard(track_id)
             state.track_video_map.pop(track_id, None)
+            state.track_name_map.pop(track_id, None)
             continue
 
         try:
@@ -123,20 +136,27 @@ def main() -> None:
                 logger.info(
                     "[DRY RUN] Would remove video %s for unliked track %s",
                     video_id,
-                    track_id,
+                    track_label,
                 )
             else:
                 youtube.remove_playlist_item(playlist_item_id)
                 removed_count += 1
 
+            if track_meta:
+                report.removed.append(
+                    TrackInfo(name=track_meta["name"], artist=track_meta["artist"])
+                )
+
             state.processed_ids.discard(track_id)
             state.track_video_map.pop(track_id, None)
+            state.track_name_map.pop(track_id, None)
 
-        except Exception:
+        except Exception as exc:
             logger.exception(
                 "Error removing video %s for track %s — continuing", video_id, track_id
             )
             removal_failed_count += 1
+            report.failed.append((track_label, str(exc)))
 
     # --- Add new tracks ---
     added_count = 0
@@ -157,6 +177,7 @@ def main() -> None:
                 if video_id is None:
                     logger.warning("No video found for %s — skipping permanently", track_label)
                     not_found_count += 1
+                    report.not_found.append(TrackInfo(name=track["name"], artist=track["artist"]))
                     state.processed_ids.add(track["id"])
                     continue
 
@@ -165,6 +186,10 @@ def main() -> None:
                     skipped_count += 1
                     state.processed_ids.add(track["id"])
                     state.track_video_map[track["id"]] = video_id
+                    state.track_name_map[track["id"]] = {
+                        "name": track["name"],
+                        "artist": track["artist"],
+                    }
                     continue
 
                 if args.dry_run:
@@ -175,11 +200,17 @@ def main() -> None:
                     existing_video_ids.add(video_id)
                     added_count += 1
 
+                report.added.append(TrackInfo(name=track["name"], artist=track["artist"]))
                 state.processed_ids.add(track["id"])
                 state.track_video_map[track["id"]] = video_id
+                state.track_name_map[track["id"]] = {
+                    "name": track["name"],
+                    "artist": track["artist"],
+                }
 
-            except Exception:
+            except Exception as exc:
                 logger.exception("Error processing %s — continuing with next track", track_label)
+                report.failed.append((track_label, str(exc)))
 
     if not args.dry_run:
         state_mgr.save(state)
@@ -193,6 +224,23 @@ def main() -> None:
         removed_count,
         removal_failed_count,
     )
+
+    if config.email_enabled:
+        _send_report(config, report, logger)
+    else:
+        logger.info("Email notifications not configured — skipping report")
+
+
+def _send_report(config, report: SyncReport, logger: logging.Logger) -> None:
+    notifier = EmailNotifier(
+        smtp_host=config.email_smtp_host,
+        smtp_port=config.email_smtp_port,
+        smtp_user=config.email_smtp_user,
+        smtp_password=config.email_smtp_password,
+        from_email=config.email_from,
+        to_email=config.email_to,
+    )
+    notifier.send_sync_report(report)
 
 
 if __name__ == "__main__":
