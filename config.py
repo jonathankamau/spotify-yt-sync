@@ -18,6 +18,26 @@ class Config:
     state_file_path: str
     log_file_path: str
 
+    # Email notification settings (all optional — leave unset to disable notifications)
+    email_smtp_host: str | None = None
+    email_smtp_port: int = 587
+    email_smtp_user: str | None = None
+    email_smtp_password: str | None = None
+    email_from: str | None = None
+    email_to: str | None = None
+
+    @property
+    def email_enabled(self) -> bool:
+        return all(
+            [
+                self.email_smtp_host,
+                self.email_smtp_user,
+                self.email_smtp_password,
+                self.email_from,
+                self.email_to,
+            ]
+        )
+
 
 _REQUIRED_VARS = {
     "SPOTIFY_CLIENT_ID": "Spotify Developer Dashboard → Client ID",
@@ -39,6 +59,12 @@ def load_config() -> Config:
     if missing:
         raise OSError("Missing required environment variables:\n" + "\n".join(missing))
 
+    smtp_port_raw = os.getenv("EMAIL_SMTP_PORT", "587")
+    try:
+        smtp_port = int(smtp_port_raw) if smtp_port_raw else 587
+    except ValueError:
+        smtp_port = 587
+
     return Config(
         spotify_client_id=os.environ["SPOTIFY_CLIENT_ID"],
         spotify_client_secret=os.environ["SPOTIFY_CLIENT_SECRET"],
@@ -49,4 +75,10 @@ def load_config() -> Config:
         youtube_playlist_id=os.environ["YOUTUBE_PLAYLIST_ID"],
         state_file_path=os.environ["STATE_FILE_PATH"],
         log_file_path=os.environ["LOG_FILE_PATH"],
+        email_smtp_host=os.getenv("EMAIL_SMTP_HOST") or None,
+        email_smtp_port=smtp_port,
+        email_smtp_user=os.getenv("EMAIL_SMTP_USER") or None,
+        email_smtp_password=os.getenv("EMAIL_SMTP_PASSWORD") or None,
+        email_from=os.getenv("EMAIL_FROM") or None,
+        email_to=os.getenv("EMAIL_TO") or None,
     )

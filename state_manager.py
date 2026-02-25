@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 class SyncState:
     processed_ids: set[str] = field(default_factory=set)
     track_video_map: dict[str, str] = field(default_factory=dict)
+    # Maps track_id -> {"name": ..., "artist": ...} for reporting removals by name
+    track_name_map: dict[str, dict[str, str]] = field(default_factory=dict)
 
 
 class StateBackend(ABC):
@@ -35,13 +37,19 @@ class JsonFileStateBackend(StateBackend):
 
         processed_ids = set(data.get("processed_track_ids", []))
         track_video_map = data.get("track_video_map", {})
+        track_name_map = data.get("track_name_map", {})
         logger.info("Loaded %d processed track IDs from state", len(processed_ids))
-        return SyncState(processed_ids=processed_ids, track_video_map=track_video_map)
+        return SyncState(
+            processed_ids=processed_ids,
+            track_video_map=track_video_map,
+            track_name_map=track_name_map,
+        )
 
     def save(self, state: SyncState) -> None:
         data = {
             "processed_track_ids": sorted(state.processed_ids),
             "track_video_map": dict(sorted(state.track_video_map.items())),
+            "track_name_map": dict(sorted(state.track_name_map.items())),
         }
         with open(self._path, "w") as f:
             json.dump(data, f, indent=2)
