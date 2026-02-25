@@ -1,31 +1,30 @@
 """Unit tests for youtube_client.py."""
 
-import json
-import pytest
-from unittest.mock import MagicMock, patch, call, mock_open
+from unittest.mock import MagicMock, mock_open, patch
 
+import pytest
 from googleapiclient.errors import HttpError
 
-from youtube_client import YouTubeClient, MAX_RETRIES, BACKOFF_BASE
 from config import Config
-
+from youtube_client import BACKOFF_BASE, MAX_RETRIES, YouTubeClient
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_config(**overrides):
-    defaults = dict(
-        spotify_client_id="cid",
-        spotify_client_secret="csecret",
-        spotify_redirect_uri="http://localhost:8888/callback",
-        spotify_token_path=".spotify_token_cache",
-        youtube_client_secrets_file="client_secrets.json",
-        youtube_token_path=".youtube_token_cache",
-        youtube_playlist_id="PLtest",
-        state_file_path="state.json",
-        log_file_path="sync.log",
-    )
+    defaults = {
+        "spotify_client_id": "cid",
+        "spotify_client_secret": "csecret",
+        "spotify_redirect_uri": "http://localhost:8888/callback",
+        "spotify_token_path": ".spotify_token_cache",
+        "youtube_client_secrets_file": "client_secrets.json",
+        "youtube_token_path": ".youtube_token_cache",
+        "youtube_playlist_id": "PLtest",
+        "state_file_path": "state.json",
+        "log_file_path": "sync.log",
+    }
     defaults.update(overrides)
     return Config(**defaults)
 
@@ -52,10 +51,7 @@ def _make_client_with_mock_yt(mock_yt):
 
 
 def _make_playlist_page(video_ids, page_token=None, next_page_token=None):
-    items = [
-        {"contentDetails": {"videoId": vid}, "id": f"item_{vid}"}
-        for vid in video_ids
-    ]
+    items = [{"contentDetails": {"videoId": vid}, "id": f"item_{vid}"} for vid in video_ids]
     response = {"items": items}
     if next_page_token:
         response["nextPageToken"] = next_page_token
@@ -70,6 +66,7 @@ def _make_search_response(video_ids):
 # ---------------------------------------------------------------------------
 # Authentication
 # ---------------------------------------------------------------------------
+
 
 class TestYouTubeClientAuthentication:
     def test_raises_when_token_file_not_found(self, tmp_path):
@@ -114,7 +111,7 @@ class TestYouTubeClientAuthentication:
 
             with patch("youtube_client.Request"):
                 with patch("youtube_client.build"):
-                    with patch("builtins.open", mock_open()) as mocked_open:
+                    with patch("builtins.open", mock_open()):
                         YouTubeClient(config)
 
             mock_creds.refresh.assert_called_once()
@@ -137,6 +134,7 @@ class TestYouTubeClientAuthentication:
 # ---------------------------------------------------------------------------
 # search_video()
 # ---------------------------------------------------------------------------
+
 
 class TestSearchVideo:
     def test_returns_video_id_when_found(self):
@@ -180,6 +178,7 @@ class TestSearchVideo:
 # ---------------------------------------------------------------------------
 # get_playlist_item_map()
 # ---------------------------------------------------------------------------
+
 
 class TestGetPlaylistItemMap:
     def test_single_page_returns_mapping(self):
@@ -225,6 +224,7 @@ class TestGetPlaylistItemMap:
 # get_playlist_video_ids()
 # ---------------------------------------------------------------------------
 
+
 class TestGetPlaylistVideoIds:
     def test_returns_set_of_video_ids(self):
         mock_yt = MagicMock()
@@ -248,6 +248,7 @@ class TestGetPlaylistVideoIds:
 # ---------------------------------------------------------------------------
 # add_video_to_playlist()
 # ---------------------------------------------------------------------------
+
 
 class TestAddVideoToPlaylist:
     def test_calls_insert_with_correct_body(self):
@@ -275,6 +276,7 @@ class TestAddVideoToPlaylist:
 # remove_playlist_item()
 # ---------------------------------------------------------------------------
 
+
 class TestRemovePlaylistItem:
     def test_calls_delete_with_correct_item_id(self):
         mock_yt = MagicMock()
@@ -297,6 +299,7 @@ class TestRemovePlaylistItem:
 # ---------------------------------------------------------------------------
 # validate_playlist()
 # ---------------------------------------------------------------------------
+
 
 class TestValidatePlaylist:
     def test_returns_true_when_playlist_found(self):
@@ -324,6 +327,7 @@ class TestValidatePlaylist:
 # ---------------------------------------------------------------------------
 # _request_with_retry()
 # ---------------------------------------------------------------------------
+
 
 class TestYouTubeRequestWithRetry:
     def _get_client(self):

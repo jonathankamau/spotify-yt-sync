@@ -1,9 +1,8 @@
 """Unit tests for config.py."""
 
-import os
 import pytest
 
-from config import Config, load_config, _REQUIRED_VARS
+from config import _REQUIRED_VARS, Config, load_config
 
 
 class TestConfig:

@@ -39,7 +39,7 @@ def load_bootstrap_config() -> dict:
     if not os.path.exists(CONFIG_FILE):
         print(f"ERROR: {CONFIG_FILE} not found. Create it first — see README.md")
         sys.exit(1)
-    with open(CONFIG_FILE, "r") as f:
+    with open(CONFIG_FILE) as f:
         cfg = json.load(f)
     required = [
         "github_pat",
@@ -201,7 +201,7 @@ def main() -> None:
     print("\n" + "=" * 60)
     print("  Bootstrap complete!")
     print("=" * 60)
-    print(f"\nNext step: run  python setup_auth.py  to complete OAuth setup.")
+    print("\nNext step: run  python setup_auth.py  to complete OAuth setup.")
     print(f"Repo URL: https://github.com/{cfg['github_username']}/{REPO_NAME}")
 
 

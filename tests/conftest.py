@@ -1,9 +1,8 @@
 """Shared pytest fixtures for spotify-yt-sync tests."""
 
 import json
-import os
-import pytest
 
+import pytest
 
 # ---------------------------------------------------------------------------
 # Minimal valid environment for load_config()

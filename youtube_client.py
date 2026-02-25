@@ -26,11 +26,10 @@ class YouTubeClient:
 
         try:
             creds = Credentials.from_authorized_user_file(token_path, SCOPES)
-        except (FileNotFoundError, ValueError):
+        except (FileNotFoundError, ValueError) as exc:
             raise RuntimeError(
-                f"No cached YouTube token found at {token_path}. "
-                "Run setup_auth.py first."
-            )
+                f"No cached YouTube token found at {token_path}. Run setup_auth.py first."
+            ) from exc
 
         if creds and creds.expired and creds.refresh_token:
             logger.info("YouTube token expired, refreshing...")
@@ -40,8 +39,7 @@ class YouTubeClient:
 
         if not creds or not creds.valid:
             raise RuntimeError(
-                "YouTube credentials are invalid and cannot be refreshed. "
-                "Re-run setup_auth.py."
+                "YouTube credentials are invalid and cannot be refreshed. Re-run setup_auth.py."
             )
 
         return build("youtube", "v3", credentials=creds)
@@ -50,9 +48,11 @@ class YouTubeClient:
         query = f"{track_name} {artist} official music video"
         try:
             response = self._request_with_retry(
-                lambda: self._youtube.search()
-                .list(part="snippet", q=query, type="video", maxResults=1)
-                .execute()
+                lambda: (
+                    self._youtube.search()
+                    .list(part="snippet", q=query, type="video", maxResults=1)
+                    .execute()
+                )
             )
             items = response.get("items", [])
             if items:
@@ -75,14 +75,16 @@ class YouTubeClient:
 
         while True:
             response = self._request_with_retry(
-                lambda pt=page_token: self._youtube.playlistItems()
-                .list(
-                    part="contentDetails",
-                    playlistId=playlist_id,
-                    maxResults=50,
-                    pageToken=pt,
+                lambda pt=page_token: (
+                    self._youtube.playlistItems()
+                    .list(
+                        part="contentDetails",
+                        playlistId=playlist_id,
+                        maxResults=50,
+                        pageToken=pt,
+                    )
+                    .execute()
                 )
-                .execute()
             )
 
             for item in response.get("items", []):
@@ -106,26 +108,20 @@ class YouTubeClient:
             }
         }
         self._request_with_retry(
-            lambda: self._youtube.playlistItems()
-            .insert(part="snippet", body=body)
-            .execute()
+            lambda: self._youtube.playlistItems().insert(part="snippet", body=body).execute()
         )
         logger.info("Added video %s to playlist %s", video_id, playlist_id)
 
     def remove_playlist_item(self, playlist_item_id: str) -> None:
         self._request_with_retry(
-            lambda: self._youtube.playlistItems()
-            .delete(id=playlist_item_id)
-            .execute()
+            lambda: self._youtube.playlistItems().delete(id=playlist_item_id).execute()
         )
         logger.info("Removed playlist item %s", playlist_item_id)
 
     def validate_playlist(self, playlist_id: str) -> bool:
         try:
             response = self._request_with_retry(
-                lambda: self._youtube.playlists().list(
-                    part="snippet", id=playlist_id
-                ).execute()
+                lambda: self._youtube.playlists().list(part="snippet", id=playlist_id).execute()
             )
             if not response.get("items"):
                 logger.error("Playlist %s not found or not accessible", playlist_id)

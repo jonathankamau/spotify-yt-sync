@@ -1,30 +1,30 @@
 """Unit tests for spotify_client.py."""
 
-import time
+from unittest.mock import MagicMock, call, patch
+
 import pytest
 import spotipy
 
-from unittest.mock import MagicMock, patch, call
-from spotify_client import SpotifyClient, MAX_RETRIES, BACKOFF_BASE
 from config import Config
-
+from spotify_client import BACKOFF_BASE, MAX_RETRIES, SpotifyClient
 
 # ---------------------------------------------------------------------------
 # Helpers / fixtures
 # ---------------------------------------------------------------------------
 
+
 def _make_config(**overrides):
-    defaults = dict(
-        spotify_client_id="cid",
-        spotify_client_secret="csecret",
-        spotify_redirect_uri="http://localhost:8888/callback",
-        spotify_token_path=".spotify_token_cache",
-        youtube_client_secrets_file="client_secrets.json",
-        youtube_token_path=".youtube_token_cache",
-        youtube_playlist_id="PLtest",
-        state_file_path="state.json",
-        log_file_path="sync.log",
-    )
+    defaults = {
+        "spotify_client_id": "cid",
+        "spotify_client_secret": "csecret",
+        "spotify_redirect_uri": "http://localhost:8888/callback",
+        "spotify_token_path": ".spotify_token_cache",
+        "youtube_client_secrets_file": "client_secrets.json",
+        "youtube_token_path": ".youtube_token_cache",
+        "youtube_playlist_id": "PLtest",
+        "state_file_path": "state.json",
+        "log_file_path": "sync.log",
+    }
     defaults.update(overrides)
     return Config(**defaults)
 
@@ -33,13 +33,15 @@ def _make_spotify_page(track_ids, next_url=None):
     """Build a fake Spotify saved-tracks response page."""
     items = []
     for tid in track_ids:
-        items.append({
-            "track": {
-                "id": tid,
-                "name": f"Song {tid}",
-                "artists": [{"name": "Artist A"}],
+        items.append(
+            {
+                "track": {
+                    "id": tid,
+                    "name": f"Song {tid}",
+                    "artists": [{"name": "Artist A"}],
+                }
             }
-        })
+        )
     return {"items": items, "next": next_url}
 
 
@@ -65,6 +67,7 @@ def _make_client_with_mock_sp(mock_sp):
 # ---------------------------------------------------------------------------
 # Authentication
 # ---------------------------------------------------------------------------
+
 
 class TestSpotifyClientAuthentication:
     def test_raises_when_no_cached_token(self, tmp_path):
@@ -113,6 +116,7 @@ class TestSpotifyClientAuthentication:
 # ---------------------------------------------------------------------------
 # get_liked_songs()
 # ---------------------------------------------------------------------------
+
 
 class TestGetLikedSongs:
     def test_returns_empty_list_when_no_songs(self):
@@ -209,6 +213,7 @@ class TestGetLikedSongs:
 # ---------------------------------------------------------------------------
 # _request_with_retry()
 # ---------------------------------------------------------------------------
+
 
 class TestRequestWithRetry:
     def _get_client(self):

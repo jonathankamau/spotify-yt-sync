@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+
 from dotenv import load_dotenv
 
 
@@ -34,15 +35,9 @@ _REQUIRED_VARS = {
 def load_config() -> Config:
     load_dotenv()
 
-    missing = [
-        f"  - {var}: {desc}"
-        for var, desc in _REQUIRED_VARS.items()
-        if not os.getenv(var)
-    ]
+    missing = [f"  - {var}: {desc}" for var, desc in _REQUIRED_VARS.items() if not os.getenv(var)]
     if missing:
-        raise EnvironmentError(
-            "Missing required environment variables:\n" + "\n".join(missing)
-        )
+        raise OSError("Missing required environment variables:\n" + "\n".join(missing))
 
     return Config(
         spotify_client_id=os.environ["SPOTIFY_CLIENT_ID"],

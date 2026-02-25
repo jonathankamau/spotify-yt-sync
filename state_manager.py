@@ -15,12 +15,10 @@ class SyncState:
 
 class StateBackend(ABC):
     @abstractmethod
-    def load(self) -> SyncState:
-        ...
+    def load(self) -> SyncState: ...
 
     @abstractmethod
-    def save(self, state: SyncState) -> None:
-        ...
+    def save(self, state: SyncState) -> None: ...
 
 
 class JsonFileStateBackend(StateBackend):
@@ -32,7 +30,7 @@ class JsonFileStateBackend(StateBackend):
             logger.info("No state file found at %s, starting fresh", self._path)
             return SyncState()
 
-        with open(self._path, "r") as f:
+        with open(self._path) as f:
             data = json.load(f)
 
         processed_ids = set(data.get("processed_track_ids", []))

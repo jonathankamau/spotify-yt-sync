@@ -1,15 +1,13 @@
 """Unit tests for state_manager.py."""
 
 import json
-import os
-import pytest
 
-from state_manager import SyncState, JsonFileStateBackend, StateManager
-
+from state_manager import JsonFileStateBackend, StateManager, SyncState
 
 # ---------------------------------------------------------------------------
 # SyncState dataclass
 # ---------------------------------------------------------------------------
+
 
 class TestSyncState:
     def test_default_processed_ids_is_empty_set(self):
@@ -39,6 +37,7 @@ class TestSyncState:
 # ---------------------------------------------------------------------------
 # JsonFileStateBackend.load()
 # ---------------------------------------------------------------------------
+
 
 class TestJsonFileStateBackendLoad:
     def test_returns_empty_state_when_file_missing(self, tmp_path):
@@ -95,6 +94,7 @@ class TestJsonFileStateBackendLoad:
 # JsonFileStateBackend.save()
 # ---------------------------------------------------------------------------
 
+
 class TestJsonFileStateBackendSave:
     def test_save_creates_file(self, tmp_path):
         path = tmp_path / "state.json"
@@ -132,10 +132,12 @@ class TestJsonFileStateBackendSave:
         """track_video_map in saved file must have sorted keys."""
         path = tmp_path / "state.json"
         backend = JsonFileStateBackend(str(path))
-        backend.save(SyncState(
-            processed_ids=set(),
-            track_video_map={"zzz": "v3", "aaa": "v1", "mmm": "v2"},
-        ))
+        backend.save(
+            SyncState(
+                processed_ids=set(),
+                track_video_map={"zzz": "v3", "aaa": "v1", "mmm": "v2"},
+            )
+        )
         data = json.loads(path.read_text())
         assert list(data["track_video_map"].keys()) == ["aaa", "mmm", "zzz"]
 
@@ -171,6 +173,7 @@ class TestJsonFileStateBackendSave:
 # ---------------------------------------------------------------------------
 # StateManager (delegate wrapper)
 # ---------------------------------------------------------------------------
+
 
 class TestStateManager:
     def test_load_delegates_to_backend(self, tmp_path):

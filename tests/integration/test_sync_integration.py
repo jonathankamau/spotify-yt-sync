@@ -6,18 +6,17 @@ mocking the external API clients (SpotifyClient, YouTubeClient) and
 I/O side-effects (load_config, setup_logging, sys.exit).
 """
 
-import json
-import sys
+from unittest.mock import MagicMock, patch
+
 import pytest
-from unittest.mock import MagicMock, patch, call
 
-from state_manager import SyncState, JsonFileStateBackend, StateManager
 from config import Config
-
+from state_manager import JsonFileStateBackend, StateManager, SyncState
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_config(state_file_path: str, log_file_path: str = "sync.log") -> Config:
     return Config(
@@ -93,12 +92,13 @@ def _run_main(
     if dry_run:
         argv.append("--dry-run")
 
-    with patch("main.load_config", return_value=config), \
-         patch("main.setup_logging"), \
-         patch("main.SpotifyClient", return_value=mock_spotify), \
-         patch("main.YouTubeClient", return_value=mock_youtube), \
-         patch("main.StateManager") as mock_mgr_cls:
-
+    with (
+        patch("main.load_config", return_value=config),
+        patch("main.setup_logging"),
+        patch("main.SpotifyClient", return_value=mock_spotify),
+        patch("main.YouTubeClient", return_value=mock_youtube),
+        patch("main.StateManager") as mock_mgr_cls,
+    ):
         # Wire StateManager to the real JsonFileStateBackend so disk state works
         real_mgr = StateManager(real_backend)
         real_mgr.save = _capture_save  # type: ignore[method-assign]
@@ -106,6 +106,7 @@ def _run_main(
 
         with patch("sys.argv", argv):
             import main
+
             main.main()
 
     # For dry-run, save is not called → read current in-memory state instead
@@ -118,6 +119,7 @@ def _run_main(
 # ---------------------------------------------------------------------------
 # No-op scenarios
 # ---------------------------------------------------------------------------
+
 
 class TestNoChanges:
     def test_no_sync_needed_when_no_songs(self, tmp_path):
@@ -160,6 +162,7 @@ class TestNoChanges:
 # ---------------------------------------------------------------------------
 # Addition scenarios
 # ---------------------------------------------------------------------------
+
 
 class TestAddNewTracks:
     def test_adds_single_new_track(self, tmp_path):
@@ -257,8 +260,9 @@ class TestAddNewTracks:
         JsonFileStateBackend(state_path).save(SyncState())
 
         # Create more songs than the limit
-        songs = [_make_liked_song(f"t{i}", f"Song {i}", "Band") for i in range(MAX_TRACKS_PER_RUN + 5)]
-        search_map = {f"Song {i} - Band": f"vid_{i}" for i in range(MAX_TRACKS_PER_RUN + 5)}
+        n = MAX_TRACKS_PER_RUN + 5
+        songs = [_make_liked_song(f"t{i}", f"Song {i}", "Band") for i in range(n)]
+        search_map = {f"Song {i} - Band": f"vid_{i}" for i in range(n)}
 
         _, mock_yt, _ = _run_main(
             liked_songs=songs,
@@ -295,13 +299,16 @@ class TestAddNewTracks:
 
         real_backend = JsonFileStateBackend(state_path)
 
-        with patch("main.load_config", return_value=config), \
-             patch("main.setup_logging"), \
-             patch("main.SpotifyClient", return_value=mock_spotify), \
-             patch("main.YouTubeClient", return_value=mock_youtube), \
-             patch("main.StateManager", return_value=StateManager(real_backend)), \
-             patch("sys.argv", ["main.py"]):
+        with (
+            patch("main.load_config", return_value=config),
+            patch("main.setup_logging"),
+            patch("main.SpotifyClient", return_value=mock_spotify),
+            patch("main.YouTubeClient", return_value=mock_youtube),
+            patch("main.StateManager", return_value=StateManager(real_backend)),
+            patch("sys.argv", ["main.py"]),
+        ):
             import main
+
             main.main()
 
         # t2 must still be added despite t1 failing
@@ -311,6 +318,7 @@ class TestAddNewTracks:
 # ---------------------------------------------------------------------------
 # Removal scenarios
 # ---------------------------------------------------------------------------
+
 
 class TestRemoveUnlikedTracks:
     def test_removes_unliked_track_from_playlist(self, tmp_path):
@@ -430,13 +438,16 @@ class TestRemoveUnlikedTracks:
 
         real_backend = JsonFileStateBackend(state_path)
 
-        with patch("main.load_config", return_value=config), \
-             patch("main.setup_logging"), \
-             patch("main.SpotifyClient", return_value=mock_spotify), \
-             patch("main.YouTubeClient", return_value=mock_youtube), \
-             patch("main.StateManager", return_value=StateManager(real_backend)), \
-             patch("sys.argv", ["main.py"]):
+        with (
+            patch("main.load_config", return_value=config),
+            patch("main.setup_logging"),
+            patch("main.SpotifyClient", return_value=mock_spotify),
+            patch("main.YouTubeClient", return_value=mock_youtube),
+            patch("main.StateManager", return_value=StateManager(real_backend)),
+            patch("sys.argv", ["main.py"]),
+        ):
             import main
+
             main.main()
 
         # Both removals were attempted
@@ -446,6 +457,7 @@ class TestRemoveUnlikedTracks:
 # ---------------------------------------------------------------------------
 # Mixed add + remove
 # ---------------------------------------------------------------------------
+
 
 class TestMixedAddAndRemove:
     def test_adds_new_and_removes_unliked_in_same_run(self, tmp_path):
@@ -474,6 +486,7 @@ class TestMixedAddAndRemove:
 # ---------------------------------------------------------------------------
 # Dry-run mode
 # ---------------------------------------------------------------------------
+
 
 class TestDryRunMode:
     def test_dry_run_does_not_add_to_playlist(self, tmp_path):
@@ -528,13 +541,16 @@ class TestDryRunMode:
         real_backend = JsonFileStateBackend(state_path)
         mock_mgr = MagicMock(wraps=StateManager(real_backend))
 
-        with patch("main.load_config", return_value=config), \
-             patch("main.setup_logging"), \
-             patch("main.SpotifyClient", return_value=mock_spotify), \
-             patch("main.YouTubeClient", return_value=mock_youtube), \
-             patch("main.StateManager", return_value=mock_mgr), \
-             patch("sys.argv", ["main.py", "--dry-run"]):
+        with (
+            patch("main.load_config", return_value=config),
+            patch("main.setup_logging"),
+            patch("main.SpotifyClient", return_value=mock_spotify),
+            patch("main.YouTubeClient", return_value=mock_youtube),
+            patch("main.StateManager", return_value=mock_mgr),
+            patch("sys.argv", ["main.py", "--dry-run"]),
+        ):
             import main
+
             main.main()
 
         mock_mgr.save.assert_not_called()
@@ -543,6 +559,7 @@ class TestDryRunMode:
 # ---------------------------------------------------------------------------
 # Playlist validation
 # ---------------------------------------------------------------------------
+
 
 class TestPlaylistValidation:
     def test_aborts_when_playlist_not_accessible(self, tmp_path):
@@ -560,13 +577,16 @@ class TestPlaylistValidation:
 
         real_backend = JsonFileStateBackend(state_path)
 
-        with patch("main.load_config", return_value=config), \
-             patch("main.setup_logging"), \
-             patch("main.SpotifyClient", return_value=mock_spotify), \
-             patch("main.YouTubeClient", return_value=mock_youtube), \
-             patch("main.StateManager", return_value=StateManager(real_backend)), \
-             patch("sys.argv", ["main.py"]):
+        with (
+            patch("main.load_config", return_value=config),
+            patch("main.setup_logging"),
+            patch("main.SpotifyClient", return_value=mock_spotify),
+            patch("main.YouTubeClient", return_value=mock_youtube),
+            patch("main.StateManager", return_value=StateManager(real_backend)),
+            patch("sys.argv", ["main.py"]),
+        ):
             import main
+
             with pytest.raises(SystemExit) as exc_info:
                 main.main()
 
@@ -584,13 +604,19 @@ class TestPlaylistValidation:
         mock_spotify = MagicMock()
         mock_spotify.get_liked_songs.return_value = songs
 
-        with patch("main.load_config", return_value=config), \
-             patch("main.setup_logging"), \
-             patch("main.SpotifyClient", return_value=mock_spotify), \
-             patch("main.YouTubeClient") as mock_yt_cls, \
-             patch("main.StateManager", return_value=StateManager(JsonFileStateBackend(state_path))), \
-             patch("sys.argv", ["main.py"]):
+        with (
+            patch("main.load_config", return_value=config),
+            patch("main.setup_logging"),
+            patch("main.SpotifyClient", return_value=mock_spotify),
+            patch("main.YouTubeClient") as mock_yt_cls,
+            patch(
+                "main.StateManager",
+                return_value=StateManager(JsonFileStateBackend(state_path)),
+            ),
+            patch("sys.argv", ["main.py"]),
+        ):
             import main
+
             main.main()
 
         mock_yt_cls.assert_not_called()
@@ -599,6 +625,7 @@ class TestPlaylistValidation:
 # ---------------------------------------------------------------------------
 # State persistence
 # ---------------------------------------------------------------------------
+
 
 class TestStatePersistence:
     def test_state_persisted_after_successful_add(self, tmp_path):
