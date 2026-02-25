@@ -48,6 +48,7 @@ def main() -> None:
     spotify = SpotifyClient(config)
     liked_songs = spotify.get_liked_songs()
     liked_ids = {t["id"] for t in liked_songs}
+    state.total_liked_songs = len(liked_songs)
 
     # Detect unliked tracks (previously processed but no longer in liked songs)
     unliked_ids = state.processed_ids - liked_ids
@@ -78,6 +79,8 @@ def main() -> None:
 
     if not new_tracks and not unliked_list:
         logger.info("No changes to sync. Done.")
+        if not args.dry_run:
+            state_mgr.save(state)
         return
 
     youtube = YouTubeClient(config)
