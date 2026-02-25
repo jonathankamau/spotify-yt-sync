@@ -18,6 +18,10 @@ class TestSyncState:
         state = SyncState()
         assert state.track_video_map == {}
 
+    def test_default_total_liked_songs_is_none(self):
+        state = SyncState()
+        assert state.total_liked_songs is None
+
     def test_defaults_are_independent_instances(self):
         """Two SyncState instances must not share the same mutable defaults."""
         s1 = SyncState()
@@ -80,6 +84,20 @@ class TestJsonFileStateBackendLoad:
         state = JsonFileStateBackend(str(path)).load()
         assert state.processed_ids == {"a"}
         assert state.track_video_map == {}
+
+    def test_loads_total_liked_songs(self, tmp_path):
+        path = tmp_path / "state.json"
+        data = {"processed_track_ids": [], "track_video_map": {}, "total_liked_songs": 2504}
+        path.write_text(json.dumps(data))
+        state = JsonFileStateBackend(str(path)).load()
+        assert state.total_liked_songs == 2504
+
+    def test_missing_total_liked_songs_key_defaults_to_none(self, tmp_path):
+        path = tmp_path / "state.json"
+        data = {"processed_track_ids": ["a"], "track_video_map": {}}
+        path.write_text(json.dumps(data))
+        state = JsonFileStateBackend(str(path)).load()
+        assert state.total_liked_songs is None
 
     def test_processed_ids_returned_as_set(self, tmp_path):
         path = tmp_path / "state.json"
@@ -148,11 +166,27 @@ class TestJsonFileStateBackendSave:
         original = SyncState(
             processed_ids={"id_a", "id_b"},
             track_video_map={"id_a": "vid_1", "id_b": "vid_2"},
+            total_liked_songs=2504,
         )
         backend.save(original)
         loaded = backend.load()
         assert loaded.processed_ids == original.processed_ids
         assert loaded.track_video_map == original.track_video_map
+        assert loaded.total_liked_songs == original.total_liked_songs
+
+    def test_save_writes_total_liked_songs(self, tmp_path):
+        path = tmp_path / "state.json"
+        backend = JsonFileStateBackend(str(path))
+        backend.save(SyncState(processed_ids={"t1"}, total_liked_songs=500))
+        data = json.loads(path.read_text())
+        assert data["total_liked_songs"] == 500
+
+    def test_save_omits_total_liked_songs_when_none(self, tmp_path):
+        path = tmp_path / "state.json"
+        backend = JsonFileStateBackend(str(path))
+        backend.save(SyncState(processed_ids={"t1"}))
+        data = json.loads(path.read_text())
+        assert "total_liked_songs" not in data
 
     def test_save_empty_state(self, tmp_path):
         path = tmp_path / "state.json"
