@@ -1,4 +1,3 @@
-import json
 import logging
 import time
 
@@ -47,9 +46,7 @@ class SpotifyClient:
 
         while True:
             results = self._request_with_retry(
-                lambda o=offset: self._sp.current_user_saved_tracks(
-                    limit=limit, offset=o
-                )
+                lambda o=offset: self._sp.current_user_saved_tracks(limit=limit, offset=o)
             )
             items = results.get("items", [])
             if not items:

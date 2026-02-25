@@ -53,7 +53,9 @@ class OAuthCallbackHandler(http.server.BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", "text/html")
         self.end_headers()
-        self.wfile.write(b"<html><body><h2>Authorization received! You can close this tab.</h2></body></html>")
+        self.wfile.write(
+            b"<html><body><h2>Authorization received! You can close this tab.</h2></body></html>"
+        )
         OAuthCallbackHandler.shutdown_event.set()
 
     def log_message(self, format, *args):
@@ -90,12 +92,14 @@ def wait_for_callback() -> str:
 def do_spotify_auth(cfg: dict) -> None:
     print("\n--- Spotify OAuth ---", flush=True)
 
-    params = urllib.parse.urlencode({
-        "client_id": cfg["spotify_client_id"],
-        "response_type": "code",
-        "redirect_uri": REDIRECT_URI,
-        "scope": SPOTIFY_SCOPE,
-    })
+    params = urllib.parse.urlencode(
+        {
+            "client_id": cfg["spotify_client_id"],
+            "response_type": "code",
+            "redirect_uri": REDIRECT_URI,
+            "scope": SPOTIFY_SCOPE,
+        }
+    )
     auth_url = f"https://accounts.spotify.com/authorize?{params}"
     print(f"\nOpen this URL in your browser to authorize Spotify:\n\n  {auth_url}\n", flush=True)
 
@@ -108,10 +112,14 @@ def do_spotify_auth(cfg: dict) -> None:
         print("ERROR: No authorization code received from Spotify.")
         sys.exit(1)
 
-    auth_b64 = base64.b64encode(f"{cfg['spotify_client_id']}:{cfg['spotify_client_secret']}".encode()).decode()
+    client_pair = f"{cfg['spotify_client_id']}:{cfg['spotify_client_secret']}"
+    auth_b64 = base64.b64encode(client_pair.encode()).decode()
     resp = requests.post(
         "https://accounts.spotify.com/api/token",
-        headers={"Authorization": f"Basic {auth_b64}", "Content-Type": "application/x-www-form-urlencoded"},
+        headers={
+            "Authorization": f"Basic {auth_b64}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
         data={"grant_type": "authorization_code", "code": code, "redirect_uri": REDIRECT_URI},
         timeout=15,
     )
@@ -157,7 +165,7 @@ def do_youtube_auth(cfg: dict) -> None:
         if not code:
             error = params.get("error", ["unknown"])[0]
             error_desc = params.get("error_description", [""])[0]
-            print(f"ERROR: No authorization code received from YouTube.")
+            print("ERROR: No authorization code received from YouTube.")
             print(f"  Google returned error: {error}")
             if error_desc:
                 print(f"  Description: {error_desc}")
@@ -237,7 +245,7 @@ def main() -> None:
         print(f"ERROR: {CONFIG_FILE} not found. Run bootstrap.py first.")
         sys.exit(1)
 
-    with open(CONFIG_FILE, "r") as f:
+    with open(CONFIG_FILE) as f:
         cfg = json.load(f)
 
     do_spotify_auth(cfg)

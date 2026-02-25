@@ -4,8 +4,8 @@ import sys
 
 from config import load_config
 from spotify_client import SpotifyClient
+from state_manager import JsonFileStateBackend, StateManager
 from youtube_client import YouTubeClient
-from state_manager import StateManager, JsonFileStateBackend
 
 
 def setup_logging(log_file_path: str) -> None:
@@ -26,7 +26,11 @@ MAX_REMOVALS_PER_RUN = 15
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Sync Spotify liked songs to YouTube playlist")
-    parser.add_argument("--dry-run", action="store_true", help="Log actions without modifying the YouTube playlist")
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Log actions without modifying the YouTube playlist",
+    )
     args = parser.parse_args()
 
     config = load_config()
@@ -58,12 +62,18 @@ def main() -> None:
     )
 
     if len(new_tracks) > MAX_TRACKS_PER_RUN:
-        logger.info("Limiting additions to %d tracks this run to stay within YouTube API quota", MAX_TRACKS_PER_RUN)
+        logger.info(
+            "Limiting additions to %d tracks this run to stay within YouTube API quota",
+            MAX_TRACKS_PER_RUN,
+        )
         new_tracks = new_tracks[:MAX_TRACKS_PER_RUN]
 
     unliked_list = sorted(unliked_ids)
     if len(unliked_list) > MAX_REMOVALS_PER_RUN:
-        logger.info("Limiting removals to %d tracks this run to stay within YouTube API quota", MAX_REMOVALS_PER_RUN)
+        logger.info(
+            "Limiting removals to %d tracks this run to stay within YouTube API quota",
+            MAX_REMOVALS_PER_RUN,
+        )
         unliked_list = unliked_list[:MAX_REMOVALS_PER_RUN]
 
     if not new_tracks and not unliked_list:
@@ -100,7 +110,8 @@ def main() -> None:
 
         if playlist_item_id is None:
             logger.info(
-                "Video %s not found in playlist (may have been removed manually) — cleaning up state",
+                "Video %s not found in playlist (may have been removed manually)"
+                " — cleaning up state",
                 video_id,
             )
             state.processed_ids.discard(track_id)
@@ -109,7 +120,11 @@ def main() -> None:
 
         try:
             if args.dry_run:
-                logger.info("[DRY RUN] Would remove video %s for unliked track %s", video_id, track_id)
+                logger.info(
+                    "[DRY RUN] Would remove video %s for unliked track %s",
+                    video_id,
+                    track_id,
+                )
             else:
                 youtube.remove_playlist_item(playlist_item_id)
                 removed_count += 1
@@ -118,7 +133,9 @@ def main() -> None:
             state.track_video_map.pop(track_id, None)
 
         except Exception:
-            logger.exception("Error removing video %s for track %s — continuing", video_id, track_id)
+            logger.exception(
+                "Error removing video %s for track %s — continuing", video_id, track_id
+            )
             removal_failed_count += 1
 
     # --- Add new tracks ---
@@ -168,7 +185,8 @@ def main() -> None:
         state_mgr.save(state)
 
     logger.info(
-        "Sync complete: %d added, %d already in playlist, %d not found on YouTube, %d removed, %d removal failures",
+        "Sync complete: %d added, %d already in playlist, %d not found on YouTube,"
+        " %d removed, %d removal failures",
         added_count,
         skipped_count,
         not_found_count,
