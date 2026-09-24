@@ -2,6 +2,8 @@ import logging
 import time
 
 import spotipy
+from requests.exceptions import ConnectionError as RequestsConnectionError
+from requests.exceptions import ReadTimeout
 from spotipy.oauth2 import SpotifyOAuth
 
 from config import Config
@@ -10,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 BACKOFF_BASE = 2
+REQUESTS_TIMEOUT = 30
 
 
 class SpotifyClient:
@@ -37,7 +40,7 @@ class SpotifyClient:
             logger.info("Spotify token expired, refreshing...")
             token_info = auth_manager.refresh_access_token(token_info["refresh_token"])
 
-        return spotipy.Spotify(auth_manager=auth_manager)
+        return spotipy.Spotify(auth_manager=auth_manager, requests_timeout=REQUESTS_TIMEOUT)
 
     def get_liked_songs(self) -> list[dict]:
         tracks: list[dict] = []
@@ -74,6 +77,18 @@ class SpotifyClient:
         for attempt in range(retries + 1):
             try:
                 return func()
+            except (ReadTimeout, RequestsConnectionError):
+                if attempt < retries:
+                    wait = BACKOFF_BASE ** (attempt + 1)
+                    logger.warning(
+                        "Spotify request timed out, retrying in %ds (attempt %d/%d)",
+                        wait,
+                        attempt + 1,
+                        retries,
+                    )
+                    time.sleep(wait)
+                else:
+                    raise
             except spotipy.SpotifyException as exc:
                 if exc.http_status in (429, 500, 502, 503, 504) and attempt < retries:
                     wait = BACKOFF_BASE ** (attempt + 1)
